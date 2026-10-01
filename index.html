@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -43,7 +43,8 @@
 html, body { background: var(--bg); color: var(--ink); }
 body { font: 16px/1.45 var(--f-body); -webkit-text-size-adjust: 100%; -webkit-font-smoothing: antialiased; }
 * { box-sizing: border-box; }
-button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+html { touch-action: manipulation; }
+button { font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
 input, select { font: inherit; color: var(--ink); }
 .num, input.big { font-variant-numeric: tabular-nums; }
@@ -161,7 +162,7 @@ p { margin: 0; }
 
 .hero-num { font-size: 56px; font-weight: 300; letter-spacing: -.045em; line-height: 1; font-variant-numeric: tabular-nums; }
 
-.chart { position: relative; margin-inline: -4px; }
+.chart { position: relative; margin-inline: -4px; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .chart svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
 .chart .ax { fill: var(--ink-3); font-size: 11px; font-family: var(--f-body); font-variant-numeric: tabular-nums; }
 .chart .grid { stroke: var(--line); stroke-width: 1; }
@@ -663,7 +664,7 @@ function exCard(w, e) {
     <div class="stepper"><button data-act="step" data-ex="${e.exId}" data-f="w" data-d="-1" aria-label="Less weight">−</button><label><input id="dw-${e.exId}" data-field="dw" data-ex="${e.exId}" inputmode="${isAssisted(id) ? 'text' : 'decimal'}" value="${esc(d.w)}" aria-label="Weight in kg"><small>${isAssisted(id) ? 'BW ± kg' : 'kg'}</small></label><button data-act="step" data-ex="${e.exId}" data-f="w" data-d="1" aria-label="More weight">+</button></div>
     <div class="stepper"><button data-act="step" data-ex="${e.exId}" data-f="r" data-d="-1" aria-label="Fewer reps">−</button><label><input id="dr-${e.exId}" data-field="dr" data-ex="${e.exId}" inputmode="numeric" value="${esc(d.r)}" aria-label="Reps"><small>reps</small></label><button data-act="step" data-ex="${e.exId}" data-f="r" data-d="1" aria-label="More reps">+</button></div>
     <button class="btn primary log" data-act="logSet" data-ex="${e.exId}">Log set ${n + 1}</button></div>`;
-  h += `<div class="row spread"><span class="small faint">${cfg.repMin}–${cfg.repMax} reps · +${fw(cfg.inc)} kg steps</span>${n ? '' : `<button class="btn ghost sm" data-act="removeEx" data-ex="${e.exId}">Remove from today</button>`}</div></div></section>`;
+  h += `<div class="row spread"><span class="small faint">${cfg.repMin}–${cfg.repMax} reps · usual step ${fw(cfg.inc)} kg</span>${n ? '' : `<button class="btn ghost sm" data-act="removeEx" data-ex="${e.exId}">Remove from today</button>`}</div></div></section>`;
   return h;
 }
 
@@ -739,7 +740,7 @@ function viewExDetail(id) {
   const cfg = sel === 'all' ? exCfg(id) : cfgFor(id, sel);
   const metrics = { e1rm: ['Est. 1RM', s => best(s, id)], top: [isAssisted(id) ? 'Assistance' : 'Top weight', s => topW(s)], vol: ['Volume', s => volume(s, id)] };
   const [mLabel, mFn] = metrics[S.progMetric] || metrics.e1rm;
-  let h = `<div class="top"><button class="btn ghost sm" style="justify-self:start;padding-left:0" data-act="progBack">‹ All exercises</button><h1>${esc(cfg.name)}</h1><span class="small muted">${cfg.repMin}–${cfg.repMax} reps · +${fw(cfg.inc)} kg steps</span></div>`;
+  let h = `<div class="top"><button class="btn ghost sm" style="justify-self:start;padding-left:0" data-act="progBack">‹ All exercises</button><h1>${esc(cfg.name)}</h1><span class="small muted">${cfg.repMin}–${cfg.repMax} reps · usual step ${fw(cfg.inc)} kg</span></div>`;
   h += `<div class="seg" role="group" aria-label="Day">${[['all', 'All days'], ...slots.map(s => [s, slotById(s)?.name || 'Free workout'])].map(([v, l]) => `<button data-act="progSlot" data-slot="${esc(v)}" aria-pressed="${sel === v}">${esc(l)}</button>`).join('')}</div>`;
   if (sel !== 'all') { const a = analyze(id, sel || null); h += `<div class="rec k-${a.kind}"><b>${esc(a.label)}: ${esc(a.title)}</b><span>${esc(a.text)}</span></div>`; }
   else if (slots.length > 1) h += `<p class="small faint">Pick a day to see its own status. The same lift can behave differently depending on what comes before it.</p>`;
@@ -807,6 +808,7 @@ function bindCharts() {
     };
     const hide = () => { tip.hidden = true; xh.setAttribute('visibility', 'hidden'); hl.setAttribute('visibility', 'hidden'); };
     svg.addEventListener('pointermove', show); svg.addEventListener('pointerdown', show); svg.addEventListener('pointerleave', hide);
+    el.addEventListener('contextmenu', ev => ev.preventDefault()); el.addEventListener('selectstart', ev => ev.preventDefault());
   });
 }
 
@@ -837,8 +839,8 @@ function viewPlan() {
   }
   h += `<button class="btn block" data-act="addSlot">+ Add a workout day</button>`;
   const exs = Object.values(S.exercises).sort((a, b) => a.name.localeCompare(b.name));
-  h += `<div class="card"><h2>Exercises</h2><p class="small muted">Rep range drives "add weight": when most sets reach the top of the range, the next session suggests the next step up. These are defaults; each day above can set its own range.</p>`;
-  if (exs.length) h += `<div class="lib"><span class="hd">Name</span><span class="hd">Min</span><span class="hd">Max</span><span class="hd">Step kg</span>${exs.map(e => `<input class="field" id="en-${e.id}" data-field="exName" data-ex="${e.id}" value="${esc(e.name)}" aria-label="Name"><input class="field num" id="emin-${e.id}" data-field="repMin" data-ex="${e.id}" inputmode="numeric" value="${e.repMin ?? 8}" aria-label="Min reps"><input class="field num" id="emax-${e.id}" data-field="repMax" data-ex="${e.id}" inputmode="numeric" value="${e.repMax ?? 12}" aria-label="Max reps"><input class="field num" id="einc-${e.id}" data-field="inc" data-ex="${e.id}" inputmode="decimal" value="${e.inc ?? 2.5}" aria-label="Weight step">`).join('')}</div>`;
+  h += `<div class="card"><h2>Exercises</h2><p class="small muted">Rep range drives "add weight": when most sets reach the top of the range, the next session suggests one step up. The step is only a guide: + and − also stop at weights you've used before, and you can tap the number to type any weight. These are defaults; each day above can set its own range.</p>`;
+  if (exs.length) h += `<div class="lib"><span class="hd">Name</span><span class="hd">Min</span><span class="hd">Max</span><span class="hd">Step</span>${exs.map(e => `<input class="field" id="en-${e.id}" data-field="exName" data-ex="${e.id}" value="${esc(e.name)}" aria-label="Name"><input class="field num" id="emin-${e.id}" data-field="repMin" data-ex="${e.id}" inputmode="numeric" value="${e.repMin ?? 8}" aria-label="Min reps"><input class="field num" id="emax-${e.id}" data-field="repMax" data-ex="${e.id}" inputmode="numeric" value="${e.repMax ?? 12}" aria-label="Max reps"><input class="field num" id="einc-${e.id}" data-field="inc" data-ex="${e.id}" inputmode="decimal" value="${e.inc ?? 2.5}" aria-label="Weight step">`).join('')}</div>`;
   h += `<button class="btn sm" style="justify-self:start" data-act="pick" data-target="library">+ New exercise</button></div>`;
   const bAt = +(lsGet('liftlog.backupAt') || 0);
   h += `<div class="card"><h2>Backup and export</h2><p class="small muted">Your log is saved on this phone. A backup is one file you can keep in Files or iCloud Drive, restore here, or send to Claude. The spreadsheet export (CSV: date, day, exercise, set, weight, reps) opens in Excel, Numbers or Google Sheets and can be imported into most other apps.${bAt ? ' Last backup ' + esc(ago(dstr(new Date(bAt)))) + '.' : ''}</p>
@@ -930,7 +932,14 @@ const A = {
   openEx: el => { const id = el.dataset.ex; S.openEx = S.openEx === id ? null : id; S.editSet = null; render(); if (S.openEx) document.querySelector(`.ex-h[data-ex="${id}"]`)?.scrollIntoView({ block: 'start', behavior: 'smooth' }); },
   step: el => {
     const w = active(), id = el.dataset.ex, d = draftFor(id, w), dir = +el.dataset.d;
-    if (el.dataset.f === 'w') { const v = (num(d.w) || 0) + dir * cfgFor(id, w.slotId).inc; d.w = fw(isAssisted(id) ? v : Math.max(0, v)); }
+    if (el.dataset.f === 'w') {
+      /* the step is only a guide: gyms don't load in even jumps, so +/- stops at any weight you've used for this lift that's closer than one step */
+      const cur = num(d.w) || 0, inc = cfgFor(id, w.slotId).inc;
+      const used = new Set(sessionsFor(id, undefined).flatMap(h => h.sets.map(x => x.w)).concat((entryOf(w, id)?.sets || []).map(x => x.w)));
+      const near = [...used].filter(u => dir > 0 ? u > cur + 1e-6 && u < cur + inc - 1e-6 : u < cur - 1e-6 && u > cur - inc + 1e-6);
+      const v = near.length ? (dir > 0 ? Math.min(...near) : Math.max(...near)) : cur + dir * inc;
+      d.w = fw(isAssisted(id) ? v : Math.max(0, v));
+    }
     else d.r = String(Math.max(0, (parseInt(d.r) || 0) + dir));
     const inp = document.getElementById((el.dataset.f === 'w' ? 'dw-' : 'dr-') + id);
     if (inp) { inp.value = el.dataset.f === 'w' ? d.w : d.r; anim(inp, [{ opacity: .2, transform: `translateY(${dir * 7}px)` }, { opacity: 1, transform: 'none' }], { duration: 240 }); }
