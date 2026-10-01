@@ -218,6 +218,9 @@ nav.tabs button { border: 0; background: transparent; padding: 8px 0; display: g
 nav.tabs button svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 nav.tabs button[aria-current=page] { color: var(--bg); background: var(--ink); }
 .save { font-size: 12px; color: var(--ink-3); }
+.rest { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rest i { width: 6px; height: 6px; border-radius: 50%; background: var(--ink); }
+.rest b { font-weight: 600; color: var(--ink); }
 .save.err { color: var(--bad); font-weight: 600; }
 .empty { text-align: center; padding: 28px 12px; display: grid; gap: 12px; justify-items: center; }
 .empty p { margin: 0; max-width: 34ch; color: var(--ink-2); }
@@ -251,6 +254,8 @@ nav.tabs button[aria-current=page] { background: transparent; }
   .toast { animation: rise .32s var(--spring); }
   @keyframes glow { from { background: var(--surface-2); } }
   @keyframes land { from { opacity: 0; transform: translateY(8px) scale(.94); } }
+  .rest i { animation: breathe 2.4s ease-in-out infinite; }
+  @keyframes breathe { 50% { opacity: .2; } }
   @keyframes fade { from { opacity: 0; } }
   @keyframes tick { 40% { transform: translateY(-3px); color: var(--ink); } }
   @keyframes rise { from { transform: translate(-50%, 12px) scale(.96); opacity: 0; } }
@@ -529,6 +534,7 @@ function play(f, before) {
   }
   if (f && f.draw) drawCharts(0);
   if (f && f.enter) $app.querySelectorAll(f.enter).forEach(el => anim(el, [{ opacity: 0, transform: 'translateY(-4px)' }, { opacity: 1, transform: 'none' }], { duration: 260 }));
+  if (f && f.rest) anim($app.querySelector('.rest'), [{ opacity: 0, transform: 'translateX(-6px)' }, { opacity: 1, transform: 'none' }], { duration: 360 });
   if (f && f.set) { const li = $app.querySelector(`[data-ex="${f.set.ex}"][data-i="${f.set.i}"]`); li && li.classList.add('just'); li && li.closest('.ex')?.classList.add('bump'); }
   if (!before) return;
   const els = [...$app.querySelectorAll('[data-k]')], grew = els.some(el => before.h[el.dataset.k] != null && el.offsetHeight > before.h[el.dataset.k] + 1);
@@ -632,11 +638,26 @@ function viewWorkout(w) {
   if (S.confirm === 'finish') {
     h += `</div><div class="row wrap" data-confirm><span class="small grow">${totalSets ? 'Finish and save this workout?' : 'No sets logged. Discard this workout?'}</span>${totalSets ? '<button class="btn primary sm" data-act="finish">Finish</button>' : '<button class="btn danger solid sm" data-act="discard">Discard</button>'}<button class="btn sm" data-act="confirm" data-id="">Keep going</button></div>`;
   } else h += `<button class="btn primary" data-act="confirm" data-id="finish">Finish</button></div>`;
-  h += `<div class="progress" aria-label="${totalSets} of about ${planned} sets"><i style="width:${Math.min(100, planned ? totalSets / planned * 100 : 0)}%"></i></div></div>`;
+  h += `<div class="row" style="gap:12px"><div class="progress grow" aria-label="${totalSets} of about ${planned} sets"><i style="width:${Math.min(100, planned ? totalSets / planned * 100 : 0)}%"></i></div>${restChip(w)}</div></div>`;
   for (const e of w.entries) h += exCard(w, e);
   h += `<button class="btn block" data-act="pick" data-target="workout">+ Add exercise</button>`;
   return h;
 }
+
+/* rest timer: counts up from the last logged set. Only the start time is stored (on the workout),
+   so it stays right when the phone locks or the app is closed and reopened. Hidden after 30 minutes. */
+function restText(w) {
+  const ms = Date.now() - (w.restAt || 0);
+  if (!w.restAt || ms < 0 || ms > 30 * 60e3) return '';
+  const t = Math.floor(ms / 1000); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+}
+function restChip(w) { const t = restText(w); return `<span class="rest" id="rest" aria-label="Rest time since your last set"${t ? '' : ' hidden'}><i></i>Rest <b>${t}</b></span>`; }
+function tickRest() {
+  const el = document.getElementById('rest'), w = el && active(); if (!w) return;
+  const t = restText(w); el.hidden = !t; if (t) el.querySelector('b').textContent = t;
+}
+setInterval(tickRest, 1000);
+document.addEventListener('visibilitychange', tickRest);
 
 function exCard(w, e) {
   const cfg = cfgFor(e.exId, w.slotId), sh = shadowFor(e.exId, w), rec = sh.rec, open = S.openEx === e.exId, id = e.exId;
@@ -949,10 +970,10 @@ const A = {
     const wt = num(d.w), r = parseInt(d.r);
     if (wt == null || (wt < 0 && !isAssisted(id)) || !(r >= 0)) { toast('Enter a weight and reps first.'); return; }
     let e = entryOf(w, id); if (!e) { e = { exId: id, sets: [] }; w.entries.push(e); }
-    e.sets.push({ w: wt, r });
+    e.sets.push({ w: wt, r }); w.restAt = Date.now();
     delete S.draft[id]; S.editSet = null;
     try { navigator.vibrate && navigator.vibrate(15); } catch {}
-    fx = { set: { ex: id, i: e.sets.length - 1 } }; saveWorkout(w); render();
+    fx = { set: { ex: id, i: e.sets.length - 1 }, rest: true }; saveWorkout(w); render();
   },
   editSet: el => { S.editSet = { ex: el.dataset.ex, i: +el.dataset.i }; fx = { enter: '.edit-row' }; render(); },
   editCancel: () => { S.editSet = null; render(); },
