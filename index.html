@@ -447,18 +447,21 @@ function analyze(exId, slotId, cur) {
   }
   const scores = H.map(h => best(h.sets, exId));
   /* A session counts as progress if it beat every earlier session on best est. 1RM, used a heavier top weight
-     than ever before, or did more total reps at its top weight than any earlier session at that same weight.
+     than ever before, did more total reps at its top weight than any earlier session at that same weight,
+     or kept the same top weight as the session before it and beat that session on at least one set (more reps at the same weight, or more weight).
      So adding reps (volume) at the same weight is progress, not stagnation. */
+  const setBeat = (cur, prev) => cur.some((x, j) => prev[j] && (x.w > prev[j].w || (x.w === prev[j].w && x.r > prev[j].r)));
   let idx = H.length - 1, mE = -Infinity, mW = -Infinity; const repsAt = {};
   for (let i = H.length - 1; i >= 0; i--) {
     const tw = topW(H[i].sets), reps = H[i].sets.filter(x => x.w === tw).reduce((t, x) => t + x.r, 0);
-    if (scores[i] > mE * 1.001 || tw > mW || reps > (repsAt[tw] ?? -1)) idx = i;
+    const prev = H[i + 1];
+    if (scores[i] > mE * 1.001 || tw > mW || reps > (repsAt[tw] ?? -1) || (prev && tw === topW(prev.sets) && setBeat(H[i].sets, prev.sets))) idx = i;
     mE = Math.max(mE, scores[i]); mW = Math.max(mW, tw); repsAt[tw] = Math.max(repsAt[tw] ?? -1, reps);
   }
   if (H.length >= 4 && idx >= 3) {
     const long = idx >= 5;
     return { ...base, kind: 'stall', label: 'Stagnating', title: long ? `Stuck for ${idx} sessions` : `No progress in ${idx} sessions`,
-      text: `Last progress (a new best, or more total reps at the same weight) was ${fmtShort(H[idx].w.date)}${where}. ${long ? 'Time to change something: swap the variation, move to a different rep range, or take a lighter week and build back.' : 'Push for one extra rep on the last set. If it stays flat, try a variation swap or a new rep range.'}`, suggestW: W };
+      text: `Last progress (a new best, or beating the session before on any set) was ${fmtShort(H[idx].w.date)}${where}. ${long ? 'Time to change something: swap the variation, move to a different rep range, or take a lighter week and build back.' : 'Push for one extra rep on the last set. If it stays flat, try a variation swap or a new rep range.'}`, suggestW: W };
   }
   if (H.length >= 2 && W > topW(H[1].sets)) {
     return { ...base, kind: 'build', label: 'Build reps', title: `Stay at ${wu(W, exId)}`, text: `New weight last time${where}. Add reps until your sets reach ${cfg.repMax}.`, suggestW: W };
